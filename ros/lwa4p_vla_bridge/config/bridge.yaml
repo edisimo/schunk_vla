@@ -1,0 +1,14 @@
+lwa4p_vla_bridge:
+  ros__parameters:
+    host: 127.0.0.1
+    port: 5555
+    joint_names: [arm_1_joint, arm_2_joint, arm_3_joint, arm_4_joint, arm_5_joint, arm_6_joint]
+    # below the driver's 30 deg/s, so its segment-velocity check never rejects a goal
+    max_velocity_rad_s: 0.45
+    # one goal moves at most this long; bigger jumps are clamped (bad policy output)
+    max_segment_s: 0.5
+    min_segment_s: 0.1
+    check_collisions: true
+    planning_group: arm
+    gripper_threshold_m: 0.01
+    gripper_force_n: 35.0

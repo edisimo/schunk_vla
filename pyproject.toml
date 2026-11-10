@@ -1,0 +1,41 @@
+[project]
+name = "lerobot_robot_lwa4p"
+version = "0.1.0"
+description = "VLA policies (SmolVLA, pi0.5) for the Schunk LWA 4P through LeRobot"
+readme = "README.md"
+license = "MIT"
+requires-python = ">=3.12,<3.13"
+dependencies = [
+    "lerobot[smolvla,pi,intelrealsense,gamepad,training,core-scripts]==0.7.0",
+    "torch>=2.7",
+    "torchvision>=0.22",
+]
+
+[project.scripts]
+lwa4p-vla = "lerobot_robot_lwa4p.main:main"
+
+[build-system]
+requires = ["uv_build>=0.11,<0.12"]
+build-backend = "uv_build"
+
+[tool.uv.sources]
+torch = { index = "pytorch-cu128" }
+torchvision = { index = "pytorch-cu128" }
+
+[[tool.uv.index]]
+name = "pytorch-cu128"
+url = "https://download.pytorch.org/whl/cu128"
+explicit = true
+
+[dependency-groups]
+dev = ["pytest>=8", "black>=24", "isort>=5"]
+
+[tool.black]
+line-length = 100
+
+[tool.isort]
+profile = "black"
+line_length = 100
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

@@ -1,0 +1,2 @@
+# Intel RealSense D435: user access for librealsense (pyrealsense2 uses libusb)
+SUBSYSTEMS=="usb", ATTRS{idVendor}=="8086", ATTRS{idProduct}=="0b07", MODE="0660", GROUP="plugdev", TAG+="uaccess"

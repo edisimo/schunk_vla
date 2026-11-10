@@ -1,0 +1,4 @@
+[submodule "third_party/lwa4p_driver"]
+	path = third_party/lwa4p_driver
+	url = https://github.com/Tomas-Jurov/lwa4p_driver.git
+	ignore = dirty
