@@ -93,8 +93,37 @@ class Chain:
             ]
         )
 
-    def ik_step(self, q, twist, dt, damping=0.05, margin=0.05):
-        """Joint positions after moving the tip by `twist` (root frame) for `dt` seconds."""
-        jac = self.jacobian(q)
-        dq = jac.T @ np.linalg.solve(jac @ jac.T + damping**2 * np.eye(6), np.asarray(twist) * dt)
-        return np.clip(np.asarray(q) + dq, self.lower + margin, self.upper - margin)
+    def ik(self, target, q, iters=5, damping=0.01, margin=0.05):
+        """Joint positions near `q` that put the tip at the 4x4 `target` pose (root frame)."""
+        q = np.asarray(q, dtype=float)
+        for _ in range(iters):
+            tip = self.fk(q)[0]
+            err = np.concatenate([target[:3, 3] - tip[:3, 3], rotation_error(target, tip)])
+            if np.linalg.norm(err) < 1e-7:
+                break
+            jac = self.jacobian(q)
+            dq = jac.T @ np.linalg.solve(jac @ jac.T + damping**2 * np.eye(6), err)
+            q = np.clip(q + dq, self.lower + margin, self.upper - margin)
+        return q
+
+
+def rotation_error(target, pose):
+    """Rotation vector (root frame) that turns `pose` into `target` (both 4x4)."""
+    r = target[:3, :3] @ pose[:3, :3].T
+    angle = np.arccos(np.clip((np.trace(r) - 1.0) / 2.0, -1.0, 1.0))
+    if angle < 1e-9:
+        return np.zeros(3)
+    axis = np.array([r[2, 1] - r[1, 2], r[0, 2] - r[2, 0], r[1, 0] - r[0, 1]])
+    if angle > np.pi - 1e-6:  # axis from the symmetric part when sin(angle) vanishes
+        axis = np.sqrt(np.clip((np.diag(r) + 1.0) / 2.0, 0.0, None))
+        return angle * axis / np.linalg.norm(axis)
+    return angle * axis / (2.0 * np.sin(angle))
+
+
+def rotate(rotvec, pose):
+    """`pose` (4x4) rotated by `rotvec` (root frame) about its own origin."""
+    angle = np.linalg.norm(rotvec)
+    out = pose.copy()
+    if angle > 1e-12:
+        out[:3, :3] = _axis_angle(np.asarray(rotvec) / angle, angle) @ pose[:3, :3]
+    return out

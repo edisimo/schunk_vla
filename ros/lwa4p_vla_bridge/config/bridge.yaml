@@ -11,4 +11,4 @@ lwa4p_vla_bridge:
     check_collisions: true
     planning_group: arm
     gripper_threshold_m: 0.01
-    gripper_force_n: 35.0
+    gripper_force_n: 45.0

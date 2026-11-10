@@ -32,6 +32,31 @@ def _check(args) -> None:
         print(f"RealSense: {e}")
 
 
+def _gamepad(args) -> None:
+    from .teleop import GamepadReader
+
+    pad = GamepadReader()
+    print(f"{pad.open()}: press controls to see what teleop would command (Ctrl+C to stop)")
+    last = None
+    try:
+        while True:
+            r = pad.read()
+            line = "  ".join(
+                [*(k for k in ("deadman", "precision", "close", "open") if r[k])]
+                + [
+                    f"{n}={v:+.1f}"
+                    for n, v in zip(("x", "y", "z", "roll", "pitch", "yaw"), r["twist"])
+                    if v
+                ]
+            )
+            if line != last:
+                print(line or "(idle)", flush=True)
+                last = line
+            time.sleep(0.05)
+    except KeyboardInterrupt:
+        pad.close()
+
+
 def _bench(args) -> None:
     import torch
     from lerobot.configs.policies import PreTrainedConfig
@@ -73,6 +98,7 @@ def main() -> None:
     check.add_argument("--host", default="127.0.0.1")
     check.add_argument("--port", type=int, default=5555)
     check.set_defaults(func=_check)
+    sub.add_parser("gamepad", help="show what the gamepad teleop reads").set_defaults(func=_gamepad)
     bench = sub.add_parser("bench", help="policy inference latency and peak VRAM")
     bench.add_argument("--policy", default="lerobot/smolvla_base")
     bench.add_argument("--task", default="pick up the red cube")

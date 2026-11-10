@@ -49,7 +49,8 @@ One dataset per task, so you can add, drop or re-record tasks independently:
 
 ```bash
 TASK="pick up the ampule"; NAME=pick_ampule
-scripts/vla.sh lerobot-record --robot.type=lwa4p --robot.id=lab --teleop.type=lwa4p_gamepad \
+scripts/vla.sh lerobot-record --robot.type=lwa4p --robot.id=lab \
+  --teleop.type=lwa4p_gamepad --teleop.grasp_gap_m=0.017 \
   --dataset.repo_id=local/$NAME --dataset.root=outputs/datasets/$NAME \
   --dataset.single_task="$TASK" --dataset.fps=10 --dataset.num_episodes=50 \
   --dataset.episode_time_s=40 --dataset.reset_time_s=20 \

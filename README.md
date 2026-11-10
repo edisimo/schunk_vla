@@ -110,6 +110,11 @@ an executor thread, so streaming at 10 Hz would exhaust the executor's threads w
 closed before a new one is opened (it leaked a file handle per goal), and the per-goal log line is
 throttled.
 
+**`0003` optional lab fixtures, firmer grasps.** Only the table is modelled by default; the frame,
+cap dispenser, racks and holder come back with the xacro arg `lab_fixtures:=true` (modelled but
+absent fixtures make MoveIt refuse free space). A grasp blocked by a wider part re-grasps at the
+measured width.
+
 **Locale.** With a comma-decimal locale (`LC_NUMERIC=sk_SK.UTF-8`), ROS 2 parses YAML doubles as
 strings: RViz's MotionPlanning panel fails with
 `parameter '...max_velocity' has invalid type ... setting it to {string}`.
@@ -133,7 +138,8 @@ scripts/vla.sh lwa4p-vla check
 Step-by-step guide (task design, variation, how many episodes): [docs/data_collection.md](docs/data_collection.md).
 
 ```bash
-scripts/vla.sh lerobot-record --robot.type=lwa4p --robot.id=lab --teleop.type=lwa4p_gamepad \
+scripts/vla.sh lerobot-record --robot.type=lwa4p --robot.id=lab \
+  --teleop.type=lwa4p_gamepad --teleop.grasp_gap_m=0.017 \
   --dataset.repo_id=local/pick_cube --dataset.root=outputs/datasets/pick_cube \
   --dataset.single_task="pick up the red cube and put it in the bin" \
   --dataset.fps=10 --dataset.num_episodes=50 --dataset.episode_time_s=40 \
@@ -147,7 +153,12 @@ scripts/vla.sh lerobot-record --robot.type=lwa4p --robot.id=lab --teleop.type=lw
 | left stick | TCP x / y (base frame) |
 | right stick | z (vertical), yaw (horizontal) |
 | d-pad | roll / pitch |
-| **A** / **B** | close (grasp at 35 N) / open the gripper |
+| **A** / **B** | grasp (45 N) / open the gripper |
+
+`--teleop.grasp_gap_m` is where A closes to: a few mm below the object's width (ampules
+~21 mm → 0.017), so the WSG reports HOLDING and keeps the force. With 0 it reports the part as
+blocked and lets go. The teleop moves a desired TCP pose and IK tracks it exactly, so the axes
+stay independent and releasing LB holds the commanded pose.
 
 Keyboard (LeRobot): → or `n` ends the episode, ← or `r` re-records it, Esc stops. Each frame stores the 6 joint
 angles (rad) and the finger gap (m) as state and action, the wrist RGB image (`wrist`), and depth

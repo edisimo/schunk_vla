@@ -52,6 +52,7 @@ class VlaBridge(Node):
         self.lock = threading.Lock()
         self.pos, self.stamp, self.urdf, self.error = {}, 0.0, "", ""
         self.grip_sent, self.grip_busy = None, False
+        self.last_ok = self.sent = None
         cb = ReentrantCallbackGroup()
         self.create_subscription(JointState, "joint_states", self.on_js, 50, callback_group=cb)
         latched = QoSProfile(depth=1, durability=DurabilityPolicy.TRANSIENT_LOCAL)
@@ -108,21 +109,46 @@ class VlaBridge(Node):
         # a jump beyond one segment is not a sane policy step: move towards it, no further
         scale = min(1.0, self.max_vel * self.max_seg / far) if far > 1e-9 else 1.0
         target = [b + d * scale for b, d in zip(q, dq)]
-        ok, why = self.valid(target)
+        ok, why = self.valid(target, q)
         if not ok:
-            self.send_arm(q, self.min_seg)
+            # stop at the last accepted (collision-free) target, not where the arm is coasting to
+            last = self.last_ok
+            near = (
+                last is not None
+                and max(abs(a - b) for a, b in zip(last, q)) < self.max_vel * self.max_seg
+            )
+            hold = last if near else q
+            self.send_arm(hold, self.min_seg)
             self.error = why
-            return {"ok": False, "q": q, "error": why}
-        self.send_arm(target, max(self.min_seg, far * scale / self.max_vel))
+            return {"ok": False, "q": hold, "error": why}
+        self.last_ok = target
+        # an unchanged target would only restart the drive profile: that made the arm shake
+        if self.sent is None or max(abs(a - b) for a, b in zip(target, self.sent)) > 1e-3:
+            self.send_arm(target, max(self.min_seg, far * scale / self.max_vel))
         if grip is not None:
             self.send_gripper(float(grip))
         return {"ok": True, "q": target, "error": self.error}
 
-    def valid(self, q):
+    def valid(self, target, current):
         if not self.check:
             return True, ""
+        res = self.check_state(target)
+        if res is None:
+            return False, "MoveIt collision check unavailable or timed out (move_group running?)"
+        if res.valid:
+            return True, ""
+        here = self.check_state(current)
+        # already in contact (real or in the model): accept moves that don't deepen it, so the
+        # arm can slide out of a sideways overlap (fingers around the holder) by going up
+        if here is not None and not here.valid and _depth(res) <= _depth(here) + 1e-4:
+            return True, ""
+        c = res.contacts[0] if res.contacts else None
+        return False, "collision" + (f" {c.contact_body_1} - {c.contact_body_2}" if c else "")
+
+    def check_state(self, q):
+        """MoveIt's validity result for the arm at `q`, or None when MoveIt doesn't answer."""
         if not self.validity.service_is_ready():
-            return False, "MoveIt /check_state_validity not available (move_group running?)"
+            return None
         req = GetStateValidity.Request()
         req.group_name = self.group
         req.robot_state.is_diff = True
@@ -131,15 +157,10 @@ class VlaBridge(Node):
         done = threading.Event()
         fut = self.validity.call_async(req)
         fut.add_done_callback(lambda _: done.set())
-        if not done.wait(0.2):
-            return False, "collision check timed out"
-        res = fut.result()
-        if res.valid:
-            return True, ""
-        c = res.contacts[0] if res.contacts else None
-        return False, "collision" + (f" {c.contact_body_1} - {c.contact_body_2}" if c else "")
+        return fut.result() if done.wait(0.2) else None
 
     def send_arm(self, q, duration):
+        self.sent = q
         point = JointTrajectoryPoint(positions=q)
         point.time_from_start = Duration(sec=int(duration), nanosec=int((duration % 1.0) * 1e9))
         goal = FollowJointTrajectory.Goal()
@@ -179,6 +200,10 @@ class VlaBridge(Node):
             self.grip_busy = False
             return
         gh.get_result_async().add_done_callback(lambda _: setattr(self, "grip_busy", False))
+
+
+def _depth(res):
+    return sum(c.depth for c in res.contacts)
 
 
 class _Server(socketserver.ThreadingTCPServer):
