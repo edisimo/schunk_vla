@@ -8,6 +8,8 @@ lwa4p_vla_bridge:
     # one goal moves at most this long; bigger jumps are clamped (bad policy output)
     max_segment_s: 0.5
     min_segment_s: 0.1
+    # = the driver's lookahead_s: moving targets are extended this far (velocity feed-forward)
+    lookahead_s: 0.3
     check_collisions: true
     planning_group: arm
     gripper_threshold_m: 0.01

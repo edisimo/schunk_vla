@@ -1,14 +1,15 @@
 diff --git a/src/lwa4p_driver/config/driver.yaml b/src/lwa4p_driver/config/driver.yaml
-index 4d1e251..fdae584 100644
+index 4d1e251..c9aed7d 100644
 --- a/src/lwa4p_driver/config/driver.yaml
 +++ b/src/lwa4p_driver/config/driver.yaml
-@@ -8,7 +8,8 @@ lwa4p_driver:
+@@ -8,7 +8,9 @@ lwa4p_driver:
      rate_hz: 20.0
      lookahead_s: 0.3
      max_velocity_deg_s: 30.0
 -    acceleration_deg_s2: 60.0
-+    # the motor supply sags (0x3222) above ~0.4 rad/s^2; streamed targets use the full profile
-+    acceleration_deg_s2: 23.0
++    # streamed targets are smoothed to <= 0.4 rad/s^2 (motor supply limit, 0x3222) upstream;
++    # the drive profile keeps headroom above that to track them
++    acceleration_deg_s2: 40.0
      
      limit_margin_deg: 3.0
      start_tolerance_deg: 2.0

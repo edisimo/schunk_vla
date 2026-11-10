@@ -45,6 +45,8 @@ class VlaBridge(Node):
         self.max_vel = p("max_velocity_rad_s", 0.45)
         self.max_seg = p("max_segment_s", 0.5)
         self.min_seg = p("min_segment_s", 0.1)
+        # the driver's look-ahead: moving targets are extended this far along their velocity
+        self.lookahead = p("lookahead_s", 0.3)
         self.check = p("check_collisions", True)
         self.group = p("planning_group", "arm")
         self.grip_thr = p("gripper_threshold_m", 0.01)
@@ -54,7 +56,7 @@ class VlaBridge(Node):
         self.pos, self.stamp, self.urdf, self.error = {}, 0.0, "", ""
         self.grip_sent, self.grip_busy = None, False
         self.last_ok = self.sent = None
-        self.t_sent = 0.0
+        self.t_sent, self.sent_moving = 0.0, False
         cb = ReentrantCallbackGroup()
         self.create_subscription(JointState, "joint_states", self.on_js, 50, callback_group=cb)
         latched = QoSProfile(depth=1, durability=DurabilityPolicy.TRANSIENT_LOCAL)
@@ -82,11 +84,11 @@ class VlaBridge(Node):
         if op == "state":
             return self.state()
         if op == "act":
-            return self.act([float(v) for v in req["q"]], req.get("gripper"))
+            return self.act([float(v) for v in req["q"]], req.get("gripper"), req.get("ahead"))
         if op == "hold":
             q = self.arm_q()
             if q is not None:
-                self.send_arm(q, self.min_seg)
+                self.send_arm([(q, self.min_seg)])
             return {"ok": q is not None}
         if op == "urdf":
             return {"urdf": self.urdf}
@@ -102,7 +104,7 @@ class VlaBridge(Node):
             grip, stamp = self.pos.get(GRIPPER_JOINT), self.stamp
         return {"q": self.arm_q(), "gripper": grip, "stamp": stamp, "error": self.error}
 
-    def act(self, q_cmd, grip):
+    def act(self, q_cmd, grip, ahead=None):
         q = self.arm_q()
         if q is None:
             return {"ok": False, "error": "no joint_states yet"}
@@ -113,6 +115,8 @@ class VlaBridge(Node):
         target = _toward(ref, q_cmd, self.max_vel * (min(max(since, 0.02), 0.2) if recent else 0.2))
         # and never more than one segment ahead of the arm
         target = _toward(q, target, self.max_vel * self.max_seg)
+        if ahead and max(abs(a - b) for a, b in zip(target, q_cmd)) > 1e-9:
+            ahead = None  # the client's plan no longer starts where the arm is sent
         far = max(abs(a - b) for a, b in zip(target, q))
         ok, why = self.valid(target, q)
         if not ok:
@@ -123,13 +127,33 @@ class VlaBridge(Node):
                 and max(abs(a - b) for a, b in zip(last, q)) < self.max_vel * self.max_seg
             )
             hold = last if near else q
-            self.send_arm(hold, self.min_seg)
+            self.send_arm([(hold, self.min_seg)])
             self.error = why
             return {"ok": False, "q": hold, "error": why}
         self.last_ok = target
-        # an unchanged target would only restart the drive profile: that made the arm shake
-        if self.sent is None or max(abs(a - b) for a, b in zip(target, self.sent)) > 1e-3:
-            self.send_arm(target, max(self.min_seg, far / self.max_vel))
+        t1 = max(self.min_seg, far / self.max_vel)
+        if ahead:
+            # the client's plan: the driver looks into it (velocity feed-forward); shifted later
+            # when the arm lags, so the first segment stays within the driver's speed check
+            shift = t1 - ahead[0][0]
+            points = [(qk, max(t, 0.0) + max(shift, 0.0)) for t, qk in ahead]
+            if not self.valid(points[-1][0], q)[0]:
+                points = [(target, t1)]
+        else:
+            # extend a moving target along its velocity by the driver's look-ahead, likewise
+            dt = min(max(since, 0.02), 0.2)
+            vel = [(a - b) / dt for a, b in zip(target, self.sent)] if recent else [0.0] * len(q)
+            points = [(target, t1)]
+            if max(abs(v) for v in vel) > 1e-3:
+                ext = [a + v * self.lookahead for a, v in zip(target, vel)]
+                if self.valid(ext, q)[0]:
+                    points.append((ext, t1 + self.lookahead))
+        moving = any(max(abs(a - b) for a, b in zip(qk, target)) > 1e-3 for qk, _ in points)
+        # an unchanged target would only restart the drive profile (that made the arm shake);
+        # after a move, send it once more without the extension so the arm stops on it
+        changed = self.sent is None or max(abs(a - b) for a, b in zip(target, self.sent)) > 1e-3
+        if changed or self.sent_moving or moving:
+            self.send_arm(points if moving else [(target, t1)])
         if grip is not None:
             self.send_gripper(float(grip))
         return {"ok": True, "q": target, "error": self.error}
@@ -164,13 +188,12 @@ class VlaBridge(Node):
         fut.add_done_callback(lambda _: done.set())
         return fut.result() if done.wait(0.2) else None
 
-    def send_arm(self, q, duration):
-        self.sent, self.t_sent = q, time.monotonic()
-        point = JointTrajectoryPoint(positions=q)
-        point.time_from_start = Duration(sec=int(duration), nanosec=int((duration % 1.0) * 1e9))
+    def send_arm(self, points):
+        """Send [(positions, time_from_start), ...]; the first point is the new target."""
+        self.sent, self.t_sent, self.sent_moving = points[0][0], time.monotonic(), len(points) > 1
         goal = FollowJointTrajectory.Goal()
         goal.trajectory.joint_names = self.joints
-        goal.trajectory.points = [point]
+        goal.trajectory.points = [_point(qk, t) for qk, t in points]
         self.arm.send_goal_async(goal).add_done_callback(self.on_arm_goal)
 
     def on_arm_goal(self, fut):
@@ -205,6 +228,12 @@ class VlaBridge(Node):
             self.grip_busy = False
             return
         gh.get_result_async().add_done_callback(lambda _: setattr(self, "grip_busy", False))
+
+
+def _point(q, t):
+    point = JointTrajectoryPoint(positions=list(q))
+    point.time_from_start = Duration(sec=int(t), nanosec=int((t % 1.0) * 1e9))
+    return point
 
 
 def _toward(start, goal, limit):

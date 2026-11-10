@@ -46,15 +46,18 @@ def test_action_returns_what_the_bridge_sent(robot):
     r, requests = robot
     action = {f"arm_{i}.pos": 1.0 for i in range(1, 7)} | {"gripper.pos": 0.5}
     sent = r.send_action(action)
-    assert sent["arm_1.pos"] == 0.5
+    act = next(req for req in reversed(requests) if req["op"] == "act")
+    assert sent["arm_1.pos"] == 0.5 * act["q"][0]
+    assert 0.1 < act["q"][0] < 1.0  # smoothed: on its way from 0.1 towards the goal 1.0
+    assert len(act["ahead"]) == 4
     assert sent["gripper.pos"] == r.config.gripper_open_m
-    assert requests[-1]["gripper"] == r.config.gripper_open_m
+    assert act["gripper"] == r.config.gripper_open_m
 
 
 def test_disconnect_holds(robot):
     r, requests = robot
     r.disconnect()
-    assert requests[-1]["op"] == "hold"
+    assert [req["op"] for req in requests[-2:]] == ["hold", "state"]
     r.connect()
 
 

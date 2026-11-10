@@ -699,10 +699,11 @@ training = [
 
 [[package]]
 name = "lerobot-robot-lwa4p"
-version = "0.3.0"
+version = "0.4.0"
 source = { editable = "." }
 dependencies = [
     { name = "lerobot", extra = ["core-scripts", "gamepad", "intelrealsense", "pi", "smolvla", "training"] },
+    { name = "ruckig" },
     { name = "torch" },
     { name = "torchvision" },
 ]
@@ -717,6 +718,7 @@ dev = [
 [package.metadata]
 requires-dist = [
     { name = "lerobot", extras = ["smolvla", "pi", "intelrealsense", "gamepad", "training", "core-scripts"], specifier = "==0.7.0" },
+    { name = "ruckig", specifier = ">=0.19" },
     { name = "torch", specifier = ">=2.7", index = "https://download.pytorch.org/whl/cu128" },
     { name = "torchvision", specifier = ">=0.22", index = "https://download.pytorch.org/whl/cu128" },
 ]
@@ -1508,6 +1510,19 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/c0/8f/0722ca900cc807c13a6a0c696dacf35430f72e0ec571c4275d2371fca3e9/rich-15.0.0.tar.gz", hash = "sha256:edd07a4824c6b40189fb7ac9bc4c52536e9780fbbfbddf6f1e2502c31b068c36", size = 230680, upload-time = "2026-04-12T08:24:00.75Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/82/3b/64d4899d73f91ba49a8c18a8ff3f0ea8f1c1d75481760df8c68ef5235bf5/rich-15.0.0-py3-none-any.whl", hash = "sha256:33bd4ef74232fb73fe9279a257718407f169c09b78a87ad3d296f548e27de0bb", size = 310654, upload-time = "2026-04-12T08:24:02.83Z" },
+]
+
+[[package]]
+name = "ruckig"
+version = "0.19.4"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/4a/2a/d1c1639bf76699ab1c3c1281101372f2b749d0ad8aee4c19200947b92785/ruckig-0.19.4.tar.gz", hash = "sha256:71d003bf0ff9aa0031d4520b0290a5ffa6458149f5afce8be3ed6d6fba49ea64", size = 886607, upload-time = "2026-07-15T06:59:43.034Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/ca/cd/792797f51ec3b83fc6ee93b0b6eb057f3e1e3573138a4bc67914203bfd59/ruckig-0.19.4-cp312-cp312-macosx_11_0_arm64.whl", hash = "sha256:a353458a177992771edfef9f93baa3701642fd0f852059329e2addbf8686a8cd", size = 688146, upload-time = "2026-07-15T06:59:03.789Z" },
+    { url = "https://files.pythonhosted.org/packages/b4/63/fae4e7af16e6156e0bdd8c3195cf29b4eaf6364cce5c06783703629b03ce/ruckig-0.19.4-cp312-cp312-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl", hash = "sha256:347ad72d2003886c55a4c772ae686e82d808c2d9afb99318c287d3c0e24bf12e", size = 1061774, upload-time = "2026-07-15T06:59:05.356Z" },
+    { url = "https://files.pythonhosted.org/packages/0d/9e/67cb1b29c703bd034dc364d884f151913afbdc912eafb8885a7dedfdda4e/ruckig-0.19.4-cp312-cp312-musllinux_1_2_x86_64.whl", hash = "sha256:4b36110e4fb18c54db6308c9b3e9ed7a16559d90e640a4fdea4e25d37acbc0f2", size = 1560237, upload-time = "2026-07-15T06:59:06.861Z" },
+    { url = "https://files.pythonhosted.org/packages/73/d7/0d6a829e2d70accc6943c00e8d5584a21ae20a98a34372ad9b85507a72c0/ruckig-0.19.4-cp312-cp312-win32.whl", hash = "sha256:28d96e84fb600d15bbfaa2ce5c73f7a33e42b396ff3e700293557a52f1d2bcb3", size = 1306157, upload-time = "2026-07-15T06:59:08.317Z" },
+    { url = "https://files.pythonhosted.org/packages/2e/30/1eac56a589f84007fb6fd25761612738345262e60cf517d8cae30dcc5146/ruckig-0.19.4-cp312-cp312-win_amd64.whl", hash = "sha256:9ca62445749dbcdb1533eb44ef8d434bdd43c33f7e274c9117698221c9c4d620", size = 1534285, upload-time = "2026-07-15T06:59:09.861Z" },
 ]
 
 [[package]]

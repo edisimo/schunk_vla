@@ -1,7 +1,7 @@
 <?xml version="1.0"?>
 <package format="3">
   <name>lwa4p_vla_bridge</name>
-  <version>0.2.0</version>
+  <version>0.3.0</version>
   <description>TCP bridge between a LeRobot process and the LWA 4P ROS 2 driver, with safety checks</description>
   <maintainer email="edisimo@users.noreply.github.com">Eduard Zelenay</maintainer>
   <license>MIT</license>

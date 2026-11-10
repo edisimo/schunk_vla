@@ -115,8 +115,9 @@ cap dispenser, racks and holder come back with the xacro arg `lab_fixtures:=true
 absent fixtures make MoveIt refuse free space). A grasp blocked by a wider part re-grasps at the
 measured width.
 
-**`0004` drive acceleration.** The profile acceleration is 23°/s² instead of 60°/s²: the motor supply
-sags above ~0.4 rad/s² (DC-link undervoltage `0x3222`), and streamed targets use the full profile.
+**`0004` drive acceleration.** The profile acceleration is 40°/s² instead of 60°/s². The streamed
+joint targets themselves are smoothed to ≤ 0.4 rad/s², which is what the motor supply sustains
+(above that it sags: DC-link undervoltage `0x3222`).
 
 **Locale.** With a comma-decimal locale (`LC_NUMERIC=sk_SK.UTF-8`), ROS 2 parses YAML doubles as
 strings: RViz's MotionPlanning panel fails with
@@ -207,6 +208,15 @@ elsewhere (needs an HF token with the PaliGemma license accepted), then either r
 GPU, or keep this laptop on the robot and serve the policy from the GPU machine with LeRobot's
 remote inference (`lerobot-policy-server`, `--inference.type=remote`; see the
 [remote inference guide](https://huggingface.co/docs/lerobot/en/remote_inference)). Untested here.
+
+## Motion quality
+
+Every action (gamepad or policy) goes through a [Ruckig](https://github.com/pantor/ruckig) online
+trajectory generator in the plugin: jerk-limited (0.45 rad/s, 0.4 rad/s², 2 rad/s³), phase-synchronized
+so all joints move proportionally, and planned to stop exactly on the newest target. The bridge
+hands the planned next 0.4 s to the driver, which looks 0.3 s into it (velocity feed-forward).
+Measured on the arm with 5 cm lines at 3 cm/s: ≤ 1.3 mm off the line, ≤ 0.25 mm RMS shake,
+no overshoot, 0.1-0.4 mm final error; the price is ~11 mm (0.35 s) lag while moving.
 
 ## Safety
 

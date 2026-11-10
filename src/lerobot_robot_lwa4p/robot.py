@@ -11,6 +11,7 @@ from lerobot.cameras.realsense import RealSenseCameraConfig
 from lerobot.robots import Robot, RobotConfig
 
 from .bridge_client import BridgeClient
+from .smoothing import JointSmoother
 
 logger = logging.getLogger(__name__)
 
@@ -44,7 +45,8 @@ def _wrist_camera() -> dict[str, CameraConfig]:
 @RobotConfig.register_subclass("lwa4p")
 @dataclass(kw_only=True)
 class Lwa4pConfig(RobotConfig):
-    """Bridge address, cameras (wrist D435 with depth by default), depth range, gripper gap."""
+    """Bridge address, cameras (wrist D435 with depth by default), depth range, gripper gap,
+    and the limits of the smooth joint stream (0.4 rad/s^2 is what the motor supply sustains)."""
 
     host: str = "127.0.0.1"
     port: int = 5555
@@ -52,6 +54,9 @@ class Lwa4pConfig(RobotConfig):
     gripper_open_m: float = 0.085
     depth_near_m: float = 0.1
     depth_far_m: float = 1.0
+    max_velocity_rad_s: float = 0.45
+    max_acceleration_rad_s2: float = 0.4
+    max_jerk_rad_s3: float = 2.0
 
 
 class Lwa4p(Robot):
@@ -66,6 +71,12 @@ class Lwa4p(Robot):
         self.config = config
         self.bridge = BridgeClient(config.host, config.port)
         self.cameras = make_cameras_from_configs(config.cameras)
+        self.smoother = JointSmoother(
+            len(ARM_JOINTS),
+            config.max_velocity_rad_s,
+            config.max_acceleration_rad_s2,
+            config.max_jerk_rad_s3,
+        )
         self._last_warn = 0.0
 
     @cached_property
@@ -101,6 +112,7 @@ class Lwa4p(Robot):
         state = self._state()
         if state["error"]:
             logger.warning(f"bridge reports: {state['error']}")
+        self.smoother.reset(state["q"], time.monotonic())
         for cam in self.cameras.values():
             cam.connect()
         logger.info(f"{self} connected")
@@ -125,12 +137,19 @@ class Lwa4p(Robot):
         return obs
 
     def send_action(self, action: dict) -> dict:
-        q = [float(action[f"{j}.pos"]) for j in ARM_JOINTS]
+        goal = [float(action[f"{j}.pos"]) for j in ARM_JOINTS]
         gap = min(max(float(action["gripper.pos"]), 0.0), self.config.gripper_open_m)
-        reply = self.bridge.call("act", q=q, gripper=gap)
-        if not reply["ok"] and time.monotonic() - self._last_warn > 1.0:
-            logger.warning(f"bridge refused the action: {reply['error']}")
-            self._last_warn = time.monotonic()
+        now = time.monotonic()
+        plan = self.smoother.step(goal, now)
+        q = plan[0][1].tolist()
+        ahead = [[t, p.tolist()] for t, p in plan]
+        reply = self.bridge.call("act", q=q, gripper=gap, ahead=ahead)
+        if not reply["ok"] or np.abs(np.asarray(reply["q"]) - plan[0][1]).max() > 1e-6:
+            # refused or clamped by the bridge: continue the plan from where the arm really is
+            self.smoother.reset(self._state()["q"], now)
+            if not reply["ok"] and now - self._last_warn > 1.0:
+                logger.warning(f"bridge refused the action: {reply['error']}")
+                self._last_warn = now
         sent = {f"{j}.pos": v for j, v in zip(ARM_JOINTS, reply.get("q") or q)}
         sent["gripper.pos"] = gap
         return sent
@@ -138,6 +157,7 @@ class Lwa4p(Robot):
     def hold(self) -> None:
         """Stop the arm where it is."""
         self.bridge.call("hold")
+        self.smoother.reset(self._state()["q"], time.monotonic())
 
     def disconnect(self) -> None:
         if self.bridge.is_connected:
