@@ -1,7 +1,23 @@
 """Jerk-limited, phase-synchronized joint streaming (Ruckig): all joints start and stop together."""
 
 import numpy as np
-from ruckig import InputParameter, Result, Ruckig, Synchronization, Trajectory
+from ruckig import InputParameter, Result, Ruckig, RuckigError, Synchronization, Trajectory
+
+# straight line (proportional joints) first; Ruckig can fail it numerically while streaming
+_SYNC = (Synchronization.Phase, Synchronization.Time, Synchronization.No)
+
+
+def _calculate(otg, inp, n):
+    """Ruckig plan, straight (phase) first; it can fail numerically, so fall back."""
+    traj = Trajectory(n)
+    for sync in _SYNC:
+        inp.synchronization = sync
+        try:
+            if otg.calculate(inp, traj) in (Result.Working, Result.Finished):
+                return traj, sync
+        except RuckigError:
+            pass
+    raise RuntimeError("no smooth trajectory")
 
 
 class JointSmoother:
@@ -9,6 +25,9 @@ class JointSmoother:
 
     Phase synchronization moves the joints proportionally, so the arm travels on a straight line
     in joint space; planning to stop at each target means it never overshoots when targets stop.
+    The command trails a moving target by about the braking distance, and across that distance
+    it cuts the target's curves, so the path error grows with speed squared. A target stream
+    that pauses and jumps bends the plans further, so callers should not throttle targets.
     """
 
     def __init__(self, n, max_vel, max_acc, max_jerk, horizon=(0.1, 0.2, 0.3, 0.4)):
@@ -17,8 +36,8 @@ class JointSmoother:
         self.inp.max_velocity = [max_vel] * n
         self.inp.max_acceleration = [max_acc] * n
         self.inp.max_jerk = [max_jerk] * n
-        self.inp.synchronization = Synchronization.Phase
         self.traj, self.state, self.t_plan = None, None, 0.0
+        self.fallbacks = {sync: 0 for sync in _SYNC}
 
     def reset(self, q, now):
         """Start from the arm at rest at `q`."""
@@ -35,9 +54,8 @@ class JointSmoother:
         self.inp.current_position, self.inp.current_velocity = p, v
         self.inp.current_acceleration = a
         self.inp.target_position = np.asarray(goal, dtype=float)
-        traj = Trajectory(self.n)
-        if self.otg.calculate(self.inp, traj) not in (Result.Working, Result.Finished):
-            raise RuntimeError(f"no smooth trajectory from {p} to {goal}")
+        traj, sync = _calculate(self.otg, self.inp, self.n)
+        self.fallbacks[sync] += 1
         self.traj, self.t_plan = traj, now
         return [(t, np.asarray(traj.at_time(min(t, traj.duration))[0])) for t in self.horizon]
 

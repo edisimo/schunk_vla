@@ -102,7 +102,13 @@ class VlaBridge(Node):
     def state(self):
         with self.lock:
             grip, stamp = self.pos.get(GRIPPER_JOINT), self.stamp
-        return {"q": self.arm_q(), "gripper": grip, "stamp": stamp, "error": self.error}
+        return {
+            "q": self.arm_q(),
+            "q_cmd": self.sent,  # the commanded joint target the drives are heading for
+            "gripper": grip,
+            "stamp": stamp,
+            "error": self.error,
+        }
 
     def act(self, q_cmd, grip, ahead=None):
         q = self.arm_q()
@@ -237,7 +243,7 @@ def _point(q, t):
 
 
 def _toward(start, goal, limit):
-    """`goal`, pulled back along the straight line from `start` so no joint moves more than `limit`."""
+    """`goal` pulled back on the straight line from `start` so no joint moves more than `limit`."""
     far = max(abs(g - s) for g, s in zip(goal, start))
     k = min(1.0, limit / far) if far > 1e-9 else 1.0
     return [s + (g - s) * k for g, s in zip(goal, start)]

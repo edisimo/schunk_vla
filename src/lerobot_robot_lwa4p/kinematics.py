@@ -93,8 +93,17 @@ class Chain:
             ]
         )
 
-    def ik(self, target, q, iters=5, damping=0.01, margin=0.05):
-        """Joint positions near `q` that put the tip at the 4x4 `target` pose (root frame)."""
+    def manipulability(self, q):
+        """Yoshikawa measure sqrt(det(J J^T)): 0 at a singular pose."""
+        jac = self.jacobian(q)
+        return float(np.sqrt(max(np.linalg.det(jac @ jac.T), 0.0)))
+
+    def ik(self, target, q, iters=5, damping=0.01, margin=0.05, w0=0.01, max_damping=0.08):
+        """Joint positions near `q` that put the tip at the 4x4 `target` pose (root frame).
+
+        Damping grows near singular poses (manipulability below `w0`), so the solution stays
+        bounded there instead of exploding.
+        """
         q = np.asarray(q, dtype=float)
         for _ in range(iters):
             tip = self.fk(q)[0]
@@ -102,7 +111,9 @@ class Chain:
             if np.linalg.norm(err) < 1e-7:
                 break
             jac = self.jacobian(q)
-            dq = jac.T @ np.linalg.solve(jac @ jac.T + damping**2 * np.eye(6), err)
+            w = np.sqrt(max(np.linalg.det(jac @ jac.T), 0.0))
+            lam = damping + (max_damping * (1.0 - w / w0) ** 2 if w < w0 else 0.0)
+            dq = jac.T @ np.linalg.solve(jac @ jac.T + lam**2 * np.eye(6), err)
             q = np.clip(q + dq, self.lower + margin, self.upper - margin)
         return q
 

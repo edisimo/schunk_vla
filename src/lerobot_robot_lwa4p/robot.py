@@ -56,7 +56,7 @@ class Lwa4pConfig(RobotConfig):
     depth_far_m: float = 1.0
     max_velocity_rad_s: float = 0.45
     max_acceleration_rad_s2: float = 0.4
-    max_jerk_rad_s3: float = 2.0
+    max_jerk_rad_s3: float = 4.0
 
 
 class Lwa4p(Robot):

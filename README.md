@@ -218,6 +218,15 @@ hands the planned next 0.4 s to the driver, which looks 0.3 s into it (velocity 
 Measured on the arm with 5 cm lines at 3 cm/s: ≤ 1.3 mm off the line, ≤ 0.25 mm RMS shake,
 no overshoot, 0.1-0.4 mm final error; the price is ~11 mm (0.35 s) lag while moving.
 
+The supply's acceleration limit sets the trade-off: the plan trails a moving target by about the
+braking distance and cuts its curves across it, so the path error grows with speed squared
+(offline replay of the teleop: ~2 mm at the default 3 cm/s, ~5 mm at 5 cm/s, < 0.5 mm in
+precision mode). Corners between two directions are rounded by a few mm for the same reason.
+
+The teleop also keeps the gripper on the requested line: the right stick drives either z or yaw
+(whichever dominates), the left stick snaps to x or y within ±20°, and a step the IK can't follow
+exactly (singular pose, joint limit) is refused with a message instead of bending the path.
+
 ## Safety
 
 - The driver starts with drives disabled; `enable` is always a deliberate step. Keep someone at the
