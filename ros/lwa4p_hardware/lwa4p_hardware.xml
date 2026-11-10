@@ -1,0 +1,6 @@
+<library path="lwa4p_hardware">
+  <class name="lwa4p_hardware/Lwa4pSystem" type="lwa4p_hardware::Lwa4pSystem"
+         base_class_type="hardware_interface::SystemInterface">
+    <description>Schunk LWA 4P, CiA 402 interpolated position mode over SocketCAN</description>
+  </class>
+</library>

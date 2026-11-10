@@ -1,0 +1,37 @@
+<?xml version="1.0"?>
+<!-- LWA 4P with the interpolated-position hardware plugin (ros2_control) -->
+<robot xmlns:xacro="http://www.ros.org/wiki/xacro" name="lwa4p">
+  <xacro:arg name="can_interface" default="can0"/>
+  <xacro:include filename="$(find lwa4p_description)/urdf/lwa4p.urdf.xacro"/>
+
+  <xacro:macro name="lwa4p_joint" params="index node">
+    <joint name="arm_${index}_joint">
+      <param name="node_id">${node}</param>
+      <param name="sign">1.0</param>
+      <param name="offset_deg">0.0</param>
+      <command_interface name="position"/>
+      <state_interface name="position"/>
+      <state_interface name="velocity"/>
+    </joint>
+  </xacro:macro>
+
+  <ros2_control name="lwa4p" type="system">
+    <hardware>
+      <plugin>lwa4p_hardware/Lwa4pSystem</plugin>
+      <param name="can_interface">$(arg can_interface)</param>
+      <param name="controller">arm_controller</param>
+      <!-- = 1000 / controller_manager update_rate: the drives interpolate over one cycle -->
+      <param name="cycle_ms">8</param>
+      <param name="max_velocity_deg_s">30.0</param>
+      <param name="acceleration_deg_s2">40.0</param>
+      <param name="limit_margin_deg">3.0</param>
+      <param name="commutation_check">true</param>
+    </hardware>
+    <xacro:lwa4p_joint index="1" node="3"/>
+    <xacro:lwa4p_joint index="2" node="4"/>
+    <xacro:lwa4p_joint index="3" node="5"/>
+    <xacro:lwa4p_joint index="4" node="6"/>
+    <xacro:lwa4p_joint index="5" node="7"/>
+    <xacro:lwa4p_joint index="6" node="8"/>
+  </ros2_control>
+</robot>

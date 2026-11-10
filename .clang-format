@@ -1,0 +1,15 @@
+BasedOnStyle: Google
+ColumnLimit: 100
+AccessModifierOffset: -2
+AlignAfterOpenBracket: AlwaysBreak
+BreakBeforeBraces: Custom
+BraceWrapping:
+  AfterClass: true
+  AfterStruct: true
+  AfterFunction: true
+  AfterNamespace: true
+ConstructorInitializerIndentWidth: 0
+ContinuationIndentWidth: 2
+PointerAlignment: Middle
+DerivePointerAlignment: false
+ReflowComments: false
