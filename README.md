@@ -115,6 +115,9 @@ cap dispenser, racks and holder come back with the xacro arg `lab_fixtures:=true
 absent fixtures make MoveIt refuse free space). A grasp blocked by a wider part re-grasps at the
 measured width.
 
+**`0004` drive acceleration.** The profile acceleration is 23°/s² instead of 60°/s²: the motor supply
+sags above ~0.4 rad/s² (DC-link undervoltage `0x3222`), and streamed targets use the full profile.
+
 **Locale.** With a comma-decimal locale (`LC_NUMERIC=sk_SK.UTF-8`), ROS 2 parses YAML doubles as
 strings: RViz's MotionPlanning panel fails with
 `parameter '...max_velocity' has invalid type ... setting it to {string}`.
@@ -211,8 +214,10 @@ remote inference (`lerobot-policy-server`, `--inference.type=remote`; see the
   E-stop for every policy run.
 - The bridge sends each target as a short trajectory that ends at that target, so the arm stops
   within 0.5 s when the policy or the venv process dies.
-- Each step is clamped to 0.45 rad/s and 0.5 s of motion (the driver additionally caps 30°/s and
-  rejects targets beyond its joint limits).
+- Every target is rate-limited to 0.45 rad/s against the previous one (at any command rate) and
+  kept within 0.5 s of motion of the arm; the teleop also slows down near singular poses
+  (≤ 0.3 rad/s per joint). The driver additionally caps 30°/s and 23°/s² and rejects targets beyond
+  its joint limits.
 - Each target is collision-checked by MoveIt against the workspace model (table, frame, dispenser,
   racks, self-collision). If a target collides, the arm holds and the bridge reports the colliding link pair.
 

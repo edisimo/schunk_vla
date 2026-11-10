@@ -13,6 +13,7 @@ within max_segment_s when the client goes quiet.
 import json
 import socketserver
 import threading
+import time
 
 import rclpy
 from builtin_interfaces.msg import Duration
@@ -53,6 +54,7 @@ class VlaBridge(Node):
         self.pos, self.stamp, self.urdf, self.error = {}, 0.0, "", ""
         self.grip_sent, self.grip_busy = None, False
         self.last_ok = self.sent = None
+        self.t_sent = 0.0
         cb = ReentrantCallbackGroup()
         self.create_subscription(JointState, "joint_states", self.on_js, 50, callback_group=cb)
         latched = QoSProfile(depth=1, durability=DurabilityPolicy.TRANSIENT_LOCAL)
@@ -104,11 +106,14 @@ class VlaBridge(Node):
         q = self.arm_q()
         if q is None:
             return {"ok": False, "error": "no joint_states yet"}
-        dq = [a - b for a, b in zip(q_cmd, q)]
-        far = max(abs(d) for d in dq)
-        # a jump beyond one segment is not a sane policy step: move towards it, no further
-        scale = min(1.0, self.max_vel * self.max_seg / far) if far > 1e-9 else 1.0
-        target = [b + d * scale for b, d in zip(q, dq)]
+        # joint speed limit against the previous target, so it holds at any command rate
+        since = time.monotonic() - self.t_sent
+        recent = self.sent is not None and since < 0.5
+        ref = self.sent if recent else q
+        target = _toward(ref, q_cmd, self.max_vel * (min(max(since, 0.02), 0.2) if recent else 0.2))
+        # and never more than one segment ahead of the arm
+        target = _toward(q, target, self.max_vel * self.max_seg)
+        far = max(abs(a - b) for a, b in zip(target, q))
         ok, why = self.valid(target, q)
         if not ok:
             # stop at the last accepted (collision-free) target, not where the arm is coasting to
@@ -124,7 +129,7 @@ class VlaBridge(Node):
         self.last_ok = target
         # an unchanged target would only restart the drive profile: that made the arm shake
         if self.sent is None or max(abs(a - b) for a, b in zip(target, self.sent)) > 1e-3:
-            self.send_arm(target, max(self.min_seg, far * scale / self.max_vel))
+            self.send_arm(target, max(self.min_seg, far / self.max_vel))
         if grip is not None:
             self.send_gripper(float(grip))
         return {"ok": True, "q": target, "error": self.error}
@@ -160,7 +165,7 @@ class VlaBridge(Node):
         return fut.result() if done.wait(0.2) else None
 
     def send_arm(self, q, duration):
-        self.sent = q
+        self.sent, self.t_sent = q, time.monotonic()
         point = JointTrajectoryPoint(positions=q)
         point.time_from_start = Duration(sec=int(duration), nanosec=int((duration % 1.0) * 1e9))
         goal = FollowJointTrajectory.Goal()
@@ -200,6 +205,13 @@ class VlaBridge(Node):
             self.grip_busy = False
             return
         gh.get_result_async().add_done_callback(lambda _: setattr(self, "grip_busy", False))
+
+
+def _toward(start, goal, limit):
+    """`goal`, pulled back along the straight line from `start` so no joint moves more than `limit`."""
+    far = max(abs(g - s) for g, s in zip(goal, start))
+    k = min(1.0, limit / far) if far > 1e-9 else 1.0
+    return [s + (g - s) * k for g, s in zip(goal, start)]
 
 
 def _depth(res):

@@ -30,6 +30,8 @@ class Lwa4pGamepadConfig(TeleoperatorConfig):
     precision_scale: float = 0.25
     max_lead_m: float = 0.03
     max_lead_rad: float = 0.15
+    # near singular poses a small TCP step needs big joint moves: slow down instead
+    max_joint_speed_rad_s: float = 0.3
     deadzone: float = 0.15
     gripper_open_m: float = 0.085
     # A closes to this gap: set it a few mm below the object's width, so the WSG recognises
@@ -159,8 +161,14 @@ class Lwa4pGamepad(Teleoperator):
             # wait for an arm that can't keep up (velocity limits, drive lag)
             lead = np.linalg.norm(nxt[:3, 3] - tip[:3, 3]), np.linalg.norm(rotation_error(nxt, tip))
             if lead[0] <= c.max_lead_m and lead[1] <= c.max_lead_rad:
-                self.target = nxt
-                self.q = self.chain.ik(self.target, self.q)
+                q = self.chain.ik(nxt, self.q)
+                fastest = np.abs(q - self.q).max() / max(dt, 1e-3)
+                if fastest > c.max_joint_speed_rad_s:
+                    k = c.max_joint_speed_rad_s / fastest
+                    nxt = rotate(step[3:] * k, self.target)
+                    nxt[:3, 3] += step[:3] * k
+                    q = self.chain.ik(nxt, self.q)
+                self.target, self.q = nxt, q
         if self.gap is None:  # snap to open/grasp: a measured width would be sent as a plain move
             opened = state["gripper"] > c.gripper_open_m - 0.01
             self.gap = c.gripper_open_m if opened else c.grasp_gap_m
