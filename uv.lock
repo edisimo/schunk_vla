@@ -724,7 +724,7 @@ training = [
 
 [[package]]
 name = "lerobot-robot-lwa4p"
-version = "0.5.0"
+version = "0.5.2"
 source = { editable = "." }
 dependencies = [
     { name = "lerobot", extra = ["core-scripts", "gamepad", "intelrealsense", "pi", "smolvla", "training"] },

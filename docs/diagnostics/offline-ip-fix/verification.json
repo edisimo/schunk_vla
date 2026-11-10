@@ -1,0 +1,40 @@
+{
+  "timestamp": "2026-11-10T18:13:56.018696+01:00",
+  "scope": "offline only; no real robot access since diagnostic window",
+  "versions": {
+    "client": "0.5.2",
+    "bridge": "0.3.2",
+    "hardware": "0.1.2"
+  },
+  "tests": {
+    "client": 24,
+    "ros_bridge": 22,
+    "cpp": 11,
+    "total": 57
+  },
+  "mock_integration": {
+    "accepted_goals": 50,
+    "rejected_goals": 0,
+    "hardware": "mock_components/GenericSystem",
+    "ros_domain": 169,
+    "localhost_only": true,
+    "controller_feedback": true
+  },
+  "real_ruckig_exports_validated": 180,
+  "build": "passed",
+  "formatters": [
+    "black",
+    "isort",
+    "clang-format"
+  ],
+  "git_diff_check": "passed",
+  "hardware_retest": "pending",
+  "undervoltage_electrical_cause": "unresolved",
+  "precommit_validation": {
+    "timestamp": "2026-11-10T18:22:25.235162+01:00",
+    "installed_bridge_matches_source": true,
+    "client_tests": 24,
+    "installed_ros_bridge_tests": 22,
+    "cpp_tests": 11
+  }
+}

@@ -110,7 +110,15 @@ def generate_launch_description():
                 executable="bridge",
                 name="lwa4p_vla_bridge",
                 output="screen",
-                parameters=[os.path.join(bridge, "config", "bridge.yaml")],
+                parameters=[
+                    os.path.join(bridge, "config", "bridge.yaml"),
+                    {
+                        "interpolated_position": ParameterValue(
+                            PythonExpression(["'", mode, "' == 'real' and '", impl, "' == 'ip'"]),
+                            value_type=bool,
+                        )
+                    },
+                ],
             ),
         ]
     )

@@ -169,6 +169,35 @@ angles (rad) and the finger gap (m) as state and action, the wrist RGB image (`w
 as a 3-channel image (`wrist_depth`: 0.1-1.0 m, near = bright). VLA vision encoders only take RGB,
 so this lets SmolVLA and π0.5 use depth unchanged.
 
+### Interpolated-position driver
+
+Use `ros2 launch lwa4p_vla_bridge robot.launch.py driver:=ip` for the C++ 125 Hz driver.
+The drives start disabled; `/lwa4p_driver/enable` performs the commutation checks and enables
+the trajectory controller. `/lwa4p_driver/disable` closes the brakes.
+
+In IP mode, teleop sends timestamped Ruckig trajectories with every jerk-phase boundary and
+a stationary endpoint. The trajectory controller preserves command continuity when replacing
+goals, while checking tracking errors against measured feedback. A refused or late command
+leaves the previous validated stopping trajectory in place, without a jump to measured position.
+The Python driver keeps its existing position-only path and look-ahead behavior.
+
+Complete stops may take longer than the old 0.4-second preview: IP trajectories are capped at
+2 seconds and retain the existing maximum position lead of 0.225 rad per joint. Collision
+checks run concurrently within one 35 ms budget; missing results refuse the new command.
+IK and the bridge use the actual drive bounds published by the C++ driver, including its margin.
+Client acceleration/jerk defaults are now 0.3 rad/s² and 2 rad/s³; voltage protection is unchanged.
+
+For gamepad testing, use `scripts/vla.sh lwa4p-vla teleop`. This camera-free command reports
+drive faults cleanly and never re-enables the drives. The generic `lerobot-teleoperate` entry
+point remains available, with its upstream exception-reporting behavior.
+
+See [IP motion test procedure](docs/ip-motion-test.md) for capture commands, conservative
+settings, offline regression tests and the steps for the next authorized robot test.
+
+A motor-voltage fault (`0x3222`) disables all joints. Smoother commands cannot establish the
+cause of that fault or replace a voltage measurement under load. Teleop exits when the bridge
+reports that the arm controller rejects goals, instead of continuing to send commands.
+
 ### 2. Fine-tune SmolVLA (on this laptop)
 
 ```bash

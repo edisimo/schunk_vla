@@ -9,3 +9,9 @@ __pycache__/
 .pytest_cache/
 # lerobot outputs (datasets, checkpoints)
 outputs/
+
+# Local captures, patches and downloaded vendor diagnostic tools
+docs/diagnostics/*
+!docs/diagnostics/offline-ip-fix/
+docs/diagnostics/offline-ip-fix/*
+!docs/diagnostics/offline-ip-fix/verification.json

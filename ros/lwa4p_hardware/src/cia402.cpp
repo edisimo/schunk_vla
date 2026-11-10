@@ -60,7 +60,7 @@ std::string ErrorText(uint16_t code)
   std::snprintf(hex, sizeof(hex), "0x%04X", code);
   switch (code) {
     case 0x3222:
-      return std::string(hex) + " (DC-link undervoltage: motor supply too weak / sagging)";
+      return std::string(hex) + " (DC-link undervoltage: motor supply below threshold)";
     case 0x7122:
       return std::string(hex) + " (commutation error: motor power dropped, enable again)";
     case 0x8611:

@@ -9,6 +9,10 @@ class BridgeError(ConnectionError):
     """The bridge is unreachable or closed the connection."""
 
 
+class ArmFault(RuntimeError):
+    """Motion stopped by the drive or trajectory controller; explicit recovery is required."""
+
+
 class BridgeClient:
     """Thread-safe request/reply connection to the bridge."""
 

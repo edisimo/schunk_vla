@@ -141,6 +141,7 @@ class Lwa4pGamepad(Teleoperator):
         self.chain = None
         self.q = self.target = self.gap = None
         self.t_prev = 0.0
+        self.margin = 0.05
 
     @cached_property
     def action_features(self) -> dict[str, type]:
@@ -171,6 +172,15 @@ class Lwa4pGamepad(Teleoperator):
         if not urdf:
             raise ConnectionError("bridge has no robot_description yet")
         self.chain = Chain(urdf, [f"{j}_joint" for j in ARM_JOINTS], self.config.tip_link)
+        state = self.bridge.call("state")
+        if state.get("interpolated_position"):
+            limits = np.asarray(state.get("limits"), dtype=float)
+            if limits.shape != (len(ARM_JOINTS), 2) or not np.all(np.isfinite(limits)):
+                raise ConnectionError("actual drive limits are not available yet")
+            self.chain.lower = np.maximum(self.chain.lower, limits[:, 0])
+            self.chain.upper = np.minimum(self.chain.upper, limits[:, 1])
+            # Hardware bounds already reserve 3 degrees; keep only a small IK buffer inside them.
+            self.margin = 0.005
         print(f"{name}\n{_HELP}")
 
     def get_action(self) -> dict:
@@ -184,8 +194,8 @@ class Lwa4pGamepad(Teleoperator):
         tip = self.chain.fk(ref)[0]
         # anchor only at start and after a refused target: keeping the commanded pose otherwise
         # stops the drives' gravity sag from ratcheting the target down on every LB press
-        if self.target is None or state["error"].startswith("collision"):
-            self.q, self.target = measured, tip
+        if self.target is None or state["error"]:
+            self.q, self.target = ref, tip
         if pad["deadman"] and np.any(pad["twist"]):
             scale = c.precision_scale if pad["precision"] else 1.0
             step = pad["twist"] * np.repeat([c.linear_speed_m_s, c.angular_speed_rad_s], 3)
@@ -195,13 +205,13 @@ class Lwa4pGamepad(Teleoperator):
             lead = np.linalg.norm(nxt[:3, 3] - tip[:3, 3]), np.linalg.norm(rotation_error(nxt, tip))
             # the arm isn't following (drives disabled, blocked): don't wind up
             if lead[0] <= c.max_lead_m and lead[1] <= c.max_lead_rad:
-                q = self.chain.ik(nxt, self.q)
+                q = self.chain.ik(nxt, self.q, margin=self.margin)
                 fastest = np.abs(q - self.q).max() / max(dt, 1e-3)
                 if fastest > c.max_joint_speed_rad_s:
                     k = c.max_joint_speed_rad_s / fastest
                     nxt = rotate(step[3:] * k, self.target)
                     nxt[:3, 3] += step[:3] * k
-                    q = self.chain.ik(nxt, self.q)
+                    q = self.chain.ik(nxt, self.q, margin=self.margin)
                 why = self._unsafe(q, nxt)
                 if why:
                     if now - self._last_warn > 2.0:
@@ -225,7 +235,9 @@ class Lwa4pGamepad(Teleoperator):
         c = self.config
         if np.linalg.norm(self.chain.fk(q)[0][:3, 3] - target[:3, 3]) > c.max_ik_error_m:
             return "the pose is out of reach or at a joint limit"
-        if np.any(q <= self.chain.lower + 0.051) or np.any(q >= self.chain.upper - 0.051):
+        near_lower = q <= self.chain.lower + self.margin + 0.001
+        near_upper = q >= self.chain.upper - self.margin - 0.001
+        if np.any(near_lower & (q < self.q - 1e-9)) or np.any(near_upper & (q > self.q + 1e-9)):
             return "a joint is at its limit"
         if self.chain.manipulability(q) < c.min_manipulability:
             return "too close to a singular pose (move back or rotate the wrist)"

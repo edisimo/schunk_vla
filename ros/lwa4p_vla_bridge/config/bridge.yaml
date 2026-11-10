@@ -5,10 +5,15 @@ lwa4p_vla_bridge:
     joint_names: [arm_1_joint, arm_2_joint, arm_3_joint, arm_4_joint, arm_5_joint, arm_6_joint]
     # below the driver's 30 deg/s, so its segment-velocity check never rejects a goal
     max_velocity_rad_s: 0.45
-    # one goal moves at most this long; bigger jumps are clamped (bad policy output)
+    # Joint-position lead is bounded by max_velocity_rad_s * max_segment_s.
     max_segment_s: 0.5
     min_segment_s: 0.1
-    # = the driver's lookahead_s: moving targets are extended this far (velocity feed-forward)
+    # Full braking tails preserve the position-lead bound but need more time than 0.4 s.
+    max_smooth_duration_s: 2.0
+    max_acceleration_rad_s2: 0.4
+    max_jerk_rad_s3: 4.0
+    validation_timeout_s: 0.035
+    # Python driver only: moving targets extend this far for velocity feed-forward.
     lookahead_s: 0.3
     check_collisions: true
     planning_group: arm

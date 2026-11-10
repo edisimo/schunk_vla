@@ -21,6 +21,8 @@
 #include "lwa4p_hardware/sdo_client.hpp"
 #include "rclcpp/rclcpp.hpp"
 #include "rclcpp_lifecycle/state.hpp"
+#include "std_msgs/msg/float64_multi_array.hpp"
+#include "std_msgs/msg/string.hpp"
 #include "std_srvs/srv/trigger.hpp"
 
 namespace lwa4p_hardware
@@ -81,6 +83,8 @@ private:
   bool MoveTo(size_t index, int32_t target_mdeg);
   bool Commutate(size_t index);
   uint16_t LastError(uint8_t node);
+  /** @brief Publish the drive reason used to stop teleop without losing the fault code. */
+  void PublishFault(const std::string & reason);
 
   std::vector<Joint> joints_;
   std::string interface_;
@@ -105,6 +109,8 @@ private:
   std::vector<rclcpp::ServiceBase::SharedPtr> services_;
   rclcpp::TimerBase::SharedPtr trip_timer_;
   rclcpp::Client<controller_manager_msgs::srv::SwitchController>::SharedPtr switch_client_;
+  rclcpp::Publisher<std_msgs::msg::String>::SharedPtr fault_publisher_;
+  rclcpp::Publisher<std_msgs::msg::Float64MultiArray>::SharedPtr limits_publisher_;
 };
 
 }  // namespace lwa4p_hardware

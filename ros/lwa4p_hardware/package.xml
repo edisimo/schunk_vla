@@ -1,7 +1,7 @@
 <?xml version="1.0"?>
 <package format="3">
   <name>lwa4p_hardware</name>
-  <version>0.1.0</version>
+  <version>0.1.2</version>
   <description>ros2_control hardware plugin for the Schunk LWA 4P in CiA 402 interpolated position mode (SocketCAN, SYNC-clocked PDOs)</description>
   <maintainer email="edisimo@users.noreply.github.com">Eduard Zelenay</maintainer>
   <license>MIT</license>
@@ -11,6 +11,7 @@
   <depend>rclcpp</depend>
   <depend>rclcpp_lifecycle</depend>
   <depend>std_srvs</depend>
+  <depend>std_msgs</depend>
   <depend>controller_manager_msgs</depend>
   <exec_depend>controller_manager</exec_depend>
   <exec_depend>joint_state_broadcaster</exec_depend>

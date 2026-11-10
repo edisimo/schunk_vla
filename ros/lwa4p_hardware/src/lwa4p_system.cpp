@@ -29,6 +29,8 @@
 #include "pluginlib/class_list_macros.hpp"
 #include "rclcpp/rclcpp.hpp"
 #include "rclcpp_lifecycle/state.hpp"
+#include "std_msgs/msg/float64_multi_array.hpp"
+#include "std_msgs/msg/string.hpp"
 #include "std_srvs/srv/trigger.hpp"
 
 namespace lwa4p_hardware
@@ -154,6 +156,17 @@ Lwa4pSystem::CallbackReturn Lwa4pSystem::on_configure(const rclcpp_lifecycle::St
 Lwa4pSystem::CallbackReturn Lwa4pSystem::on_activate(const rclcpp_lifecycle::State &)
 {
   node_ = rclcpp::Node::make_shared("lwa4p_driver");
+  const auto latched = rclcpp::QoS(1).transient_local();
+  fault_publisher_ = node_->create_publisher<std_msgs::msg::String>("~/fault", latched);
+  limits_publisher_ =
+    node_->create_publisher<std_msgs::msg::Float64MultiArray>("~/limits", latched);
+  std_msgs::msg::Float64MultiArray limits;
+  for (const auto & joint : joints_) {
+    limits.data.push_back(joint.lower);
+    limits.data.push_back(joint.upper);
+  }
+  limits_publisher_->publish(limits);
+  PublishFault("drives disabled");
   client_node_ = rclcpp::Node::make_shared("lwa4p_driver_controller_switch");
   switch_client_ =
     client_node_->create_client<SwitchController>("/controller_manager/switch_controller");
@@ -191,6 +204,8 @@ Lwa4pSystem::CallbackReturn Lwa4pSystem::on_deactivate(const rclcpp_lifecycle::S
   }
   services_.clear();
   trip_timer_.reset();
+  fault_publisher_.reset();
+  limits_publisher_.reset();
   node_.reset();
   executor_.reset();
   return CallbackReturn::SUCCESS;
@@ -292,7 +307,8 @@ return_type Lwa4pSystem::write(const rclcpp::Time &, const rclcpp::Duration & pe
 
 std::string Lwa4pSystem::EnableAll()
 {
-  if (enabled_) {
+  if (enabled_ && !tripped_) {
+    PublishFault("");
     return "already enabled";
   }
   HandleTrip();
@@ -304,6 +320,7 @@ std::string Lwa4pSystem::EnableAll()
   } catch (const std::exception & e) {
     DisableAll();
     RCLCPP_ERROR(Log(), "enable failed: %s", e.what());
+    PublishFault(std::string("enable failed: ") + e.what());
     return std::string("enable failed: ") + e.what();
   }
   enabled_ = true;
@@ -312,6 +329,7 @@ std::string Lwa4pSystem::EnableAll()
     return "drives enabled, but " + controller_ + " did not activate: disabled again";
   }
   RCLCPP_INFO(Log(), "all joints enabled (interpolated position), holding position");
+  PublishFault("");
   return "all joints enabled in interpolated position mode, holding position";
 }
 
@@ -399,6 +417,7 @@ void Lwa4pSystem::DisableAll()
     }
   }
   enabled_ = false;
+  PublishFault("drives disabled");
 }
 
 std::string Lwa4pSystem::ResetAll()
@@ -462,9 +481,19 @@ void Lwa4pSystem::HandleTrip()
   }
   enabled_ = false;
   tripped_ = false;
+  PublishFault(why);
   RCLCPP_ERROR(
     Log(), "%s: drives disabled (brakes closed); fix the cause, then ~/reset and ~/enable",
     why.c_str());
+}
+
+void Lwa4pSystem::PublishFault(const std::string & reason)
+{
+  if (fault_publisher_) {
+    std_msgs::msg::String message;
+    message.data = reason;
+    fault_publisher_->publish(message);
+  }
 }
 
 bool Lwa4pSystem::SwitchArmController(bool activate)

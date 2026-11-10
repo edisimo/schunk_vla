@@ -11,6 +11,9 @@ arm_controller:
     joints: [arm_1_joint, arm_2_joint, arm_3_joint, arm_4_joint, arm_5_joint, arm_6_joint]
     command_interfaces: [position]
     state_interfaces: [position, velocity]
+    # Continue streamed goals from the command; feedback lag must not rewind each replacement.
+    open_loop_control: true
+    allow_nonzero_velocity_at_trajectory_end: false
     state_publish_rate: 50.0
     action_monitor_rate: 20.0
     allow_partial_joints_goal: false
