@@ -1,6 +1,6 @@
 [project]
 name = "lerobot_robot_lwa4p"
-version = "0.1.0"
+version = "0.2.0"
 description = "VLA policies (SmolVLA, pi0.5) for the Schunk LWA 4P through LeRobot"
 readme = "README.md"
 license = "MIT"

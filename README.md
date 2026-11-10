@@ -130,6 +130,8 @@ scripts/vla.sh lwa4p-vla check
 
 ### 1. Record demonstrations
 
+Step-by-step guide (task design, variation, how many episodes): [docs/data_collection.md](docs/data_collection.md).
+
 ```bash
 scripts/vla.sh lerobot-record --robot.type=lwa4p --robot.id=lab --teleop.type=lwa4p_gamepad \
   --dataset.repo_id=local/pick_cube --dataset.root=outputs/datasets/pick_cube \
@@ -141,12 +143,13 @@ scripts/vla.sh lerobot-record --robot.type=lwa4p --robot.id=lab --teleop.type=lw
 | Gamepad | |
 |---|---|
 | hold **LB** | deadman: the arm moves only while held, and holds position when released |
+| hold **RB** too | precision mode, quarter speed (for the final approach to a grasp) |
 | left stick | TCP x / y (base frame) |
 | right stick | z (vertical), yaw (horizontal) |
 | d-pad | roll / pitch |
 | **A** / **B** | close (grasp at 35 N) / open the gripper |
 
-Keyboard (LeRobot): → ends the episode, ← re-records it, Esc stops. Each frame stores the 6 joint
+Keyboard (LeRobot): → or `n` ends the episode, ← or `r` re-records it, Esc stops. Each frame stores the 6 joint
 angles (rad) and the finger gap (m) as state and action, the wrist RGB image (`wrist`), and depth
 as a 3-channel image (`wrist_depth`: 0.1-1.0 m, near = bright). VLA vision encoders only take RGB,
 so this lets SmolVLA and π0.5 use depth unchanged.

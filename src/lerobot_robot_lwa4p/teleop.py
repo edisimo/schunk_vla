@@ -13,7 +13,7 @@ from .kinematics import Chain
 from .robot import ARM_JOINTS, MOTORS
 
 # Default indices are SDL's for Xbox-style pads on Linux; override them for other layouts.
-_HELP = """LWA 4P gamepad: hold LB to move (release = stop)
+_HELP = """LWA 4P gamepad: hold LB to move (release = stop), also hold RB for precision speed
   left stick      TCP x / y          right stick   z (vertical), yaw (horizontal)
   d-pad           roll / pitch       A / B         close / open gripper"""
 
@@ -28,6 +28,7 @@ class Lwa4pGamepadConfig(TeleoperatorConfig):
     tip_link: str = "gripper_tcp"
     linear_speed_m_s: float = 0.05
     angular_speed_rad_s: float = 0.3
+    precision_scale: float = 0.25
     deadzone: float = 0.15
     gripper_open_m: float = 0.085
     axis_left_x: int = 0
@@ -35,6 +36,7 @@ class Lwa4pGamepadConfig(TeleoperatorConfig):
     axis_right_x: int = 3
     axis_right_y: int = 4
     button_deadman: int = 4
+    button_precision: int = 5
     button_close: int = 0
     button_open: int = 1
 
@@ -106,7 +108,8 @@ class Lwa4pGamepad(Teleoperator):
             self.q = np.array(state["q"])
         else:
             hat_x, hat_y = self.pad.get_hat(0) if self.pad.get_numhats() else (0, 0)
-            twist = np.array(
+            scale = c.precision_scale if self.pad.get_button(c.button_precision) else 1.0
+            twist = scale * np.array(
                 [
                     -self._axis(c.axis_left_y) * c.linear_speed_m_s,
                     -self._axis(c.axis_left_x) * c.linear_speed_m_s,
